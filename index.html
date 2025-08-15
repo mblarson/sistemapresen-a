@@ -134,6 +134,23 @@
         .btn-primary:active {
             transform: translateY(0);
         }
+        .btn-secondary {
+            width: 100%;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
         .password-container {
             margin-top: 20px;
         }
@@ -663,6 +680,58 @@
             margin-left: 10px;
         }
         
+        /* Tela de Erro de Envio */
+        .error-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #062C3F 0%, #0a3d5a 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2500;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.5s ease;
+        }
+        .error-screen.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .error-content {
+            text-align: center;
+            max-width: 400px;
+            padding: 30px;
+            animation: fadeIn 0.8s ease-out;
+        }
+        .error-icon {
+            font-size: 80px;
+            color: #ff6b6b;
+            margin-bottom: 20px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .error-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 20px;
+            text-shadow: 0 2px 10px rgba(255, 107, 107, 0.3);
+        }
+        .error-message {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 18px;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        .error-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
         /* Responsividade para diferentes tamanhos de tela */
         @media (max-width: 480px) {
             .container {
@@ -728,6 +797,13 @@
                 padding: 12px 30px;
                 font-size: 16px;
             }
+            .error-title {
+                font-size: 24px;
+            }
+            .error-message {
+                font-size: 16px;
+                margin-bottom: 25px;
+            }
         }
         @media (max-height: 600px) {
             .container {
@@ -792,6 +868,21 @@
             .summary-button {
                 padding: 10px 25px;
                 font-size: 14px;
+            }
+            .error-content {
+                padding: 20px;
+            }
+            .error-icon {
+                font-size: 60px;
+                margin-bottom: 15px;
+            }
+            .error-title {
+                font-size: 20px;
+                margin-bottom: 15px;
+            }
+            .error-message {
+                font-size: 14px;
+                margin-bottom: 20px;
             }
         }
     </style>
@@ -912,7 +1003,7 @@
                     </div>
                 </div>
                 
-                <button type="submit" class="btn-primary">
+                <button type="submit" class="btn-primary" id="submitBtn">
                     Enviar <i class="fas fa-paper-plane"></i>
                 </button>
                 
@@ -956,6 +1047,25 @@
             <button class="summary-button" onclick="goToHomeScreen()">
                 Voltar ao Início <i class="fas fa-home"></i>
             </button>
+        </div>
+    </div>
+    
+    <!-- Tela de Erro de Envio -->
+    <div class="error-screen" id="errorScreen">
+        <div class="error-content">
+            <i class="fas fa-exclamation-triangle error-icon"></i>
+            <h2 class="error-title">Ops! Algo deu errado</h2>
+            <p class="error-message">
+                Não foi possível enviar seus dados para a planilha. Verifique sua conexão com a internet e tente novamente.
+            </p>
+            <div class="error-actions">
+                <button class="btn-primary" onclick="retrySubmission()">
+                    <i class="fas fa-redo"></i> Tentar Novamente
+                </button>
+                <button class="btn-secondary" onclick="goToFormScreen()">
+                    <i class="fas fa-edit"></i> Editar Dados
+                </button>
+            </div>
         </div>
     </div>
     
@@ -1023,20 +1133,8 @@
                     lng: -54.58786232854466,   // Substitua pelas coordenadas corretas
                     radius: 200,              // Raio em metros
                     name: "NDS"   // Nome identificativo (opcional)
-                },
+                }
                 // Adicione quantas localizações forem necessárias
-				{
-                    lat: -20.422401105696643,  // Exemplo de segunda localização -20.46378797821708, -54.58786232854466 -20.422401105696643, -54.550531018964996
-                    lng: -54.550531018964996,   // Substitua pelas coordenadas corretas
-                    radius: 200,              // Raio em metros
-                    name: "CASA MATHEWS"   // Nome identificativo (opcional)
-                },
-				{
-                    lat: -20.42263927119037,  // Exemplo de segunda localização -20.46378797821708, -54.58786232854466 -20.42263927119037, -54.554693614605576
-                    lng: -54.554693614605576,   // Substitua pelas coordenadas corretas
-                    radius: 500,              // Raio em metros
-                    name: "CASA JOELSON/MARIANA"   // Nome identificativo (opcional)
-                },
             ],
             messages: {
                 blocked: "Acesso permitido apenas durante o culto na igreja",
@@ -1051,17 +1149,20 @@
         // Configurações do Google Forms
         const FORM_CONFIG = {
             // Substitua pelo ID do seu formulário
-            formId: '1FAIpQLSfYDK6bxChVc2TJG1xdhQCE0FAH-m4y9_2uKyk0_jKz64iKJw',
+            formId: '1FAIpQLSd_8UluV1FBIcQyGNi8s9hcaTP56WIw08DazHs8_U_vVgf7EQ',
             
             // Mapeamento dos campos (substitua os IDs pelos que você encontrou)
             fields: {
-                fullName: 'entry.2146380716',   // Substitua pelo ID real do campo Nome e Sobrenome
-                sector: 'entry.510471212'      // Substitua pelo ID real do campo Setor
+                fullName: 'entry.807063831',   // Substitua pelo ID real do campo Nome e Sobrenome
+                sector: 'entry.87733387'      // Substitua pelo ID real do campo Setor
             }
         };
         
         // Variável para controlar o estado da verificação de localização
         let locationCheckCompleted = false;
+        
+        // Variável para armazenar os dados do formulário em caso de erro
+        let formDataBackup = null;
         
         // Função para calcular distância entre dois pontos (fórmula de Haversine)
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -1329,8 +1430,8 @@
             formScreen.classList.remove('active');
             
             // Preenche os dados do resumo
-            const fullName = document.getElementById('fullName').value;
-            const sector = document.querySelector('input[name="sector"]:checked')?.value || '';
+            const fullName = document.getElementById('summaryName').textContent;
+            const sector = document.getElementById('summarySector').textContent;
             const dateTime = formatDateTime();
             
             document.getElementById('summaryName').textContent = fullName;
@@ -1345,18 +1446,57 @@
         // Função para voltar à tela inicial
         function goToHomeScreen() {
             const summaryScreen = document.getElementById('summaryScreen');
+            const errorScreen = document.getElementById('errorScreen');
             const screen1 = document.getElementById('screen1');
             
-            // Esconde a tela de resumo
+            // Esconde as telas de resumo e erro
             summaryScreen.classList.remove('show');
+            errorScreen.classList.remove('show');
             
             // Mostra a tela inicial
             screen1.classList.add('active');
+            
+            // Limpa o formulário
+            document.getElementById('customForm').reset();
+            formDataBackup = null;
         }
         
-        // Adicione este evento para processar o envio do formulário
-        document.getElementById('customForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+        // Função para voltar à tela do formulário
+        function goToFormScreen() {
+            const errorScreen = document.getElementById('errorScreen');
+            const formScreen = document.getElementById('formScreen');
+            
+            // Esconde a tela de erro
+            errorScreen.classList.remove('show');
+            
+            // Mostra a tela do formulário
+            formScreen.classList.add('active');
+            
+            // Restaura os dados do formulário se houver backup
+            if (formDataBackup) {
+                document.getElementById('fullName').value = formDataBackup.fullName;
+                if (formDataBackup.sector) {
+                    document.getElementById(`sector${formDataBackup.sector}`).checked = true;
+                }
+            }
+        }
+        
+        // Função para tentar enviar novamente
+        function retrySubmission() {
+            const errorScreen = document.getElementById('errorScreen');
+            
+            // Esconde a tela de erro
+            errorScreen.classList.remove('show');
+            
+            // Tenta enviar novamente
+            submitFormData();
+        }
+        
+        // Função para enviar dados do formulário
+        async function submitFormData() {
+            const submitBtn = document.getElementById('submitBtn');
+            const successMessage = document.getElementById('successMessage');
+            const loading = document.getElementById('loading');
             
             // Obtém os valores dos campos
             const fullName = document.getElementById('fullName').value;
@@ -1368,6 +1508,16 @@
                 return;
             }
             
+            // Faz backup dos dados
+            formDataBackup = { fullName, sector };
+            
+            // Desabilita o botão de envio
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+            
+            // Mostra o loading
+            loading.classList.add('show');
+            
             // Prepara os dados para enviar ao Google Forms
             const formData = {
                 [FORM_CONFIG.fields.fullName]: fullName,
@@ -1377,31 +1527,65 @@
             // URL de envio do Google Forms
             const url = `https://docs.google.com/forms/d/e/${FORM_CONFIG.formId}/formResponse`;
             
-            // Mostra mensagem de sucesso temporária
-            const successMessage = document.getElementById('successMessage');
-            successMessage.classList.add('show');
-            
-            // Envia os dados para o Google Forms
-            fetch(url, {
-                method: 'POST',
-                mode: 'no-cors', // Necessário porque o Google Forms não permite CORS
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: new URLSearchParams(formData)
-            })
-            .then(() => {
+            try {
+                // Tenta enviar usando um método mais confiável
+                const response = await fetch(url, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams(formData)
+                });
+                
+                // Como usamos no-cors, não podemos verificar o status diretamente
+                // Vamos assumir que funcionou se não houver exceção
+                
+                // Preenche os dados do resumo
+                document.getElementById('summaryName').textContent = fullName;
+                document.getElementById('summarySector').textContent = sector;
+                
+                const dateTime = formatDateTime();
+                document.getElementById('summaryDate').textContent = dateTime.date;
+                document.getElementById('summaryTime').textContent = dateTime.time;
+                
+                // Mostra mensagem de sucesso temporária
+                successMessage.classList.add('show');
+                
                 // Após 1.5 segundos, mostra a tela de resumo
                 setTimeout(() => {
+                    loading.classList.remove('show');
                     showSummaryScreen();
                     successMessage.classList.remove('show');
+                    
+                    // Reabilita o botão de envio
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Enviar <i class="fas fa-paper-plane"></i>';
                 }, 1500);
-            })
-            .catch(error => {
+                
+            } catch (error) {
                 console.error('Erro ao enviar formulário:', error);
-                alert('Ocorreu um erro ao enviar o formulário. Tente novamente.');
-                successMessage.classList.remove('show');
-            });
+                
+                // Esconde o loading
+                loading.classList.remove('show');
+                
+                // Mostra a tela de erro
+                const errorScreen = document.getElementById('errorScreen');
+                const formScreen = document.getElementById('formScreen');
+                
+                formScreen.classList.remove('active');
+                errorScreen.classList.add('show');
+                
+                // Reabilita o botão de envio
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Enviar <i class="fas fa-paper-plane"></i>';
+            }
+        }
+        
+        // Adicione este evento para processar o envio do formulário
+        document.getElementById('customForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitFormData();
         });
         
         // Função para voltar à tela inicial
