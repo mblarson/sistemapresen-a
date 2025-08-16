@@ -732,6 +732,13 @@
             gap: 15px;
         }
         
+        /* Iframe oculto para envio do formulário */
+        #submit-iframe {
+            display: none;
+            width: 0;
+            height: 0;
+        }
+        
         /* Responsividade para diferentes tamanhos de tela */
         @media (max-width: 480px) {
             .container {
@@ -888,6 +895,9 @@
     </style>
 </head>
 <body>
+    <!-- Iframe oculto para envio do formulário -->
+    <iframe id="submit-iframe" name="submit-iframe"></iframe>
+    
     <div class="loading" id="loading">
         <div class="loading-spinner"></div>
     </div>
@@ -1200,6 +1210,13 @@
                     return;
                 }
                 
+                // Aumentar o timeout e adicionar opções de precisão
+                const options = {
+                    enableHighAccuracy: true,
+                    timeout: 15000, // Aumentar para 15 segundos
+                    maximumAge: 0 // Não usar cache de localização
+                };
+                
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         const userLat = position.coords.latitude;
@@ -1242,9 +1259,18 @@
                         resolve(isAllowed);
                     },
                     (error) => {
-                        alert(LOCATION_SETTINGS.messages.permissionDenied);
+                        let message = LOCATION_SETTINGS.messages.permissionDenied;
+                        if (error.code === error.PERMISSION_DENIED) {
+                            message = "Permissão de localização negada. Por favor, permita o acesso à sua localização.";
+                        } else if (error.code === error.POSITION_UNAVAILABLE) {
+                            message = "Informação de localização indisponível. Verifique sua conexão.";
+                        } else if (error.code === error.TIMEOUT) {
+                            message = "Tempo esgotado ao obter localização. Tente novamente.";
+                        }
+                        alert(message);
                         resolve(false);
-                    }
+                    },
+                    options
                 );
             });
         }
@@ -1276,12 +1302,35 @@
             window.location.reload();
         }
         
+        // Função para verificar conexão com a internet
+        async function checkInternetConnection() {
+            try {
+                const online = await fetch('https://www.google.com/favicon.ico', {
+                    mode: 'no-cors',
+                    cache: 'no-cache'
+                });
+                return true;
+            } catch (error) {
+                return false;
+            }
+        }
+        
         // Evento de carregamento da página
         window.addEventListener('DOMContentLoaded', async () => {
             const loading = document.getElementById('loading');
             loading.classList.add('show');
             
             try {
+                // Verificar se a geolocalização está disponível
+                if (!navigator.geolocation) {
+                    alert(LOCATION_SETTINGS.messages.unsupported);
+                    document.getElementById('screen1').classList.add('active');
+                    return;
+                }
+                
+                // Aguardar um pouco para garantir que o navegador esteja pronto
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
                 // Verificar localização antes de mostrar qualquer tela
                 const isLocationAllowed = await checkUserLocation();
                 
@@ -1504,7 +1553,7 @@
             submitFormData();
         }
         
-        // Função para enviar dados do formulário
+        // Função para enviar dados do formulário - VERSÃO CORRIGIDA COM IFRAME
         async function submitFormData() {
             const submitBtn = document.getElementById('submitBtn');
             const successMessage = document.getElementById('successMessage');
@@ -1520,6 +1569,16 @@
                 return;
             }
             
+            // Verificar conexão com a internet
+            const isConnected = await checkInternetConnection();
+            if (!isConnected) {
+                alert('Sem conexão com a internet. Verifique sua rede e tente novamente.');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Enviar <i class="fas fa-paper-plane"></i>';
+                loading.classList.remove('show');
+                return;
+            }
+            
             // Faz backup dos dados
             formDataBackup = { fullName, sector };
             
@@ -1530,28 +1589,37 @@
             // Mostra o loading
             loading.classList.add('show');
             
-            // Prepara os dados para enviar ao Google Forms
-            const formData = {
-                [FORM_CONFIG.fields.fullName]: fullName,
-                [FORM_CONFIG.fields.sector]: sector
-            };
-            
             // URL de envio do Google Forms
             const url = `https://docs.google.com/forms/d/e/${FORM_CONFIG.formId}/formResponse`;
             
             try {
-                // Tenta enviar usando um método mais confiável
-                const response = await fetch(url, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: new URLSearchParams(formData)
-                });
+                // Criar um formulário dinamicamente
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = url;
+                form.target = 'submit-iframe'; // Enviar para o iframe oculto
                 
-                // Como usamos no-cors, não podemos verificar o status diretamente
-                // Vamos assumir que funcionou se não houver exceção
+                // Adicionar campos ocultos
+                const fullNameField = document.createElement('input');
+                fullNameField.type = 'hidden';
+                fullNameField.name = FORM_CONFIG.fields.fullName;
+                fullNameField.value = fullName;
+                form.appendChild(fullNameField);
+                
+                const sectorField = document.createElement('input');
+                sectorField.type = 'hidden';
+                sectorField.name = FORM_CONFIG.fields.sector;
+                sectorField.value = sector;
+                form.appendChild(sectorField);
+                
+                // Adicionar ao body
+                document.body.appendChild(form);
+                
+                // Submeter o formulário
+                form.submit();
+                
+                // Aguardar um pouco para garantir o envio
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 // Preenche os dados do resumo
                 document.getElementById('summaryName').textContent = fullName;
@@ -1581,6 +1649,9 @@
                 // Esconde o loading
                 loading.classList.remove('show');
                 
+                // Mostrar mensagem de erro
+                alert('Erro ao enviar os dados. Por favor, tente novamente.');
+                
                 // Mostra a tela de erro
                 const errorScreen = document.getElementById('errorScreen');
                 const formScreen = document.getElementById('formScreen');
@@ -1591,6 +1662,11 @@
                 // Reabilita o botão de envio
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = 'Enviar <i class="fas fa-paper-plane"></i>';
+            } finally {
+                // Remover o formulário
+                if (document.body.contains(form)) {
+                    document.body.removeChild(form);
+                }
             }
         }
         
@@ -1645,4 +1721,3 @@
     </script>
 </body>
 </html>
-
