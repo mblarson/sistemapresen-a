@@ -1287,6 +1287,10 @@
         // Variável para controlar o controle de pico
         let peakControlInProgress = false;
         
+        // Variáveis para controle de envios consecutivos
+        let lastSubmissionTime = 0;
+        const MIN_SUBMISSION_INTERVAL = 5000; // 5 segundos entre envios
+        
         // Mensagens inspiradoras para o progresso
         const INSPIRATIONAL_MESSAGES = [
             "Sua presença está sendo registrada no livro da vida",
@@ -1621,6 +1625,12 @@
             summaryScreen.classList.add('show');
         }
         
+        // Função para limpar o iframe
+        function clearIframe() {
+            const iframe = document.getElementById('submit-iframe');
+            iframe.src = 'about:blank';
+        }
+        
         // Função para voltar à tela inicial
         function goToHomeScreen() {
             const summaryScreen = document.getElementById('summaryScreen');
@@ -1638,6 +1648,9 @@
             document.getElementById('customForm').reset();
             formDataBackup = null;
             peakControlInProgress = false;
+            
+            // Limpa o iframe
+            clearIframe();
         }
         
         // Função para voltar à tela do formulário
@@ -1702,7 +1715,7 @@
         
         // Função para executar o controle de pico
         function executePeakControl(callback) {
-            // Gera um delay aleatório entre 0 e 120 segundos (aumentado para 120s)
+            // Gera um delay aleatório entre 0 e 120 segundos
             const delay = Math.floor(Math.random() * 120000); // 0 a 120000ms = 0 a 120s
             
             // Mostra a barra de progresso
@@ -1712,8 +1725,8 @@
             progressContainer.classList.add('show');
             submitBtn.style.display = 'none';
             
-            // Define o tempo total da animação (120 segundos)
-            const totalTime = 120000;
+            // Define o tempo total da animação como o delay gerado
+            const totalTime = delay;
             let startTime = Date.now();
             
             // Função para atualizar a barra de progresso
@@ -1726,12 +1739,10 @@
                 if (progress < 100) {
                     requestAnimationFrame(updateProgress);
                 } else {
-                    // Quando a barra atinge 100%, executa o callback após o delay
-                    setTimeout(() => {
-                        progressContainer.classList.remove('show');
-                        submitBtn.style.display = 'block';
-                        callback();
-                    }, Math.max(0, delay - totalTime));
+                    // Quando a barra atinge 100%, executa o callback imediatamente
+                    progressContainer.classList.remove('show');
+                    submitBtn.style.display = 'block';
+                    callback();
                 }
             };
             
@@ -1743,6 +1754,15 @@
         async function submitFormData() {
             // Verifica se o controle de pico já está em andamento
             if (peakControlInProgress) {
+                alert('Aguarde o envio atual ser concluído.');
+                return;
+            }
+            
+            // Verifica se passou tempo suficiente desde o último envio
+            const currentTime = Date.now();
+            if (currentTime - lastSubmissionTime < MIN_SUBMISSION_INTERVAL) {
+                const remainingTime = Math.ceil((MIN_SUBMISSION_INTERVAL - (currentTime - lastSubmissionTime)) / 1000);
+                alert(`Aguarde ${remainingTime} segundos antes de enviar novamente.`);
                 return;
             }
             
@@ -1789,10 +1809,14 @@
                 const url = `https://docs.google.com/forms/d/e/${FORM_CONFIG.formId}/formResponse`;
                 
                 try {
+                    // Adicionar um timestamp único para evitar cache
+                    const timestamp = new Date().getTime();
+                    const uniqueUrl = `${url}?t=${timestamp}`;
+                    
                     // Criar um formulário dinamicamente
                     const form = document.createElement('form');
                     form.method = 'POST';
-                    form.action = url;
+                    form.action = uniqueUrl;
                     form.target = 'submit-iframe'; // Enviar para o iframe oculto
                     
                     // Adicionar campos ocultos
@@ -1808,14 +1832,41 @@
                     sectorField.value = sector;
                     form.appendChild(sectorField);
                     
+                    // Adicionar campo de timestamp para rastreamento
+                    const timestampField = document.createElement('input');
+                    timestampField.type = 'hidden';
+                    timestampField.name = 'entry.timestamp';
+                    timestampField.value = timestamp;
+                    form.appendChild(timestampField);
+                    
                     // Adicionar ao body
                     document.body.appendChild(form);
                     
                     // Submeter o formulário
                     form.submit();
                     
-                    // Aguardar um pouco para garantir o envio
+                    // Aguardar mais tempo para garantir o envio
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    
+                    // Verificar se o iframe carregou algo (indício de sucesso)
+                    const iframe = document.getElementById('submit-iframe');
+                    let iframeLoaded = false;
+                    
+                    // Adicionar evento de load ao iframe
+                    iframe.onload = function() {
+                        iframeLoaded = true;
+                    };
+                    
+                    // Aguardar um pouco mais para verificar o carregamento
                     await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    // Se o iframe não carregou, pode indicar problema
+                    if (!iframeLoaded) {
+                        console.warn('O iframe não carregou, o envio pode ter falhado');
+                    }
+                    
+                    // Registrar o tempo do envio
+                    lastSubmissionTime = Date.now();
                     
                     // Preenche os dados do resumo
                     document.getElementById('summaryName').textContent = fullName;
